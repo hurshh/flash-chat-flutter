@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flash_chat/constants.dart';
@@ -28,20 +30,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // Future<void> getMessages() async {
-  //   final messages =  await _fireStore.collection('messages').get();
-  //   for(var message in messages.docs){
-  //     print(message.data());
-  //   }
-  // }
-  void messagesStream() async{
-    await for(var snaps in _fireStore.collection('messages').snapshots()){
-     for(var messages in snaps.docs){
-       print(messages.data());
-     }
-    }
-  }
-
   @override
   void initState() {
     // TODO: implement initState
@@ -58,8 +46,8 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
               icon: Icon(Icons.close),
               onPressed: () {
-                // getMessages();
-                messagesStream();
+                _auth.signOut();
+                Navigator.pop(context);
                 //Implement logout functionality
               }),
         ],
@@ -73,16 +61,17 @@ class _ChatScreenState extends State<ChatScreen> {
           children: <Widget>[
             StreamBuilder<QuerySnapshot>(builder: (context,snapshot){
               if(snapshot.hasData){
-                final messages = snapshot.data.docs;
+                final messages = snapshot.data.docs.reversed;
                 List<messageBubble> messageWidgets = [];
                 for(var message in messages){
                   final messageText = message.get('text');
                   final messageSender = message.get('sender');
-                  final MessageBubble = messageBubble(sender: messageSender,text: messageText,);
+                  final MessageBubble = messageBubble(sender: messageSender,text: messageText,isME: loggedInUser.email == messageSender,);
                   messageWidgets.add(MessageBubble);
                 }
                 return Expanded(
                   child: ListView(
+                    reverse: true,
                     padding: EdgeInsets.symmetric(horizontal: 10,vertical: 20),
                     children: messageWidgets,
                   ),
@@ -110,8 +99,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       messageTextEditingController.clear();
                       //Implement send functionality.
                       _fireStore.collection('messages').add({
-                        'sender' : loggedInUser.email,
                         'text' : message,
+                        'sender' : loggedInUser.email
                       });
 
                     },
@@ -133,22 +122,31 @@ class _ChatScreenState extends State<ChatScreen> {
 class messageBubble extends StatelessWidget {
 
   final String sender,text;
+  bool isME;
+  Color messageColor(){
+    if(isME){
+      return Colors.blueAccent;
+    }
+    else{
+      return Colors.white;
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.all(10),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: isME ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Text('$sender',style: TextStyle(fontSize: 14,color: Colors.black45),),
           Material(
             elevation: 5,
             borderRadius: BorderRadius.circular(30),
-            color: Colors.blueAccent,
+            color: messageColor(),
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 15,vertical: 10),
               child: Text(
-                '$text',style: TextStyle(fontSize: 20,color: Colors.white),
+                '$text',style: TextStyle(fontSize: 20,color: isME ? Colors.white:Colors.black),
               ),
             )
         ),],
@@ -156,6 +154,6 @@ class messageBubble extends StatelessWidget {
     );
   }
 
-  messageBubble({this.sender, this.text});
+  messageBubble({this.sender, this.text, this.isME});
 }
 
